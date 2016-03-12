@@ -64,6 +64,7 @@ import se.bitcraze.crazyfliecontrol.controller.GamepadController;
 import se.bitcraze.crazyfliecontrol.controller.GyroscopeController;
 import se.bitcraze.crazyfliecontrol.controller.IController;
 import se.bitcraze.crazyfliecontrol.controller.TouchController;
+import se.bitcraze.crazyfliecontrol.controller.WearController;
 import se.bitcraze.crazyfliecontrol.prefs.PreferencesActivity;
 import se.bitcraze.crazyflielib.BleLink;
 import se.bitcraze.crazyflielib.crazyflie.ConnectionAdapter;
@@ -104,6 +105,8 @@ public class MainActivity extends Activity {
 
     private ImageButton mToggleConnectButton;
 
+    private WearController mWearController;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -135,6 +138,9 @@ public class MainActivity extends Activity {
         registerReceiver(mUsbReceiver, filter);
 
         initializeSounds();
+
+
+        mWearController = new WearController(mControls, this);
     }
 
     private void initializeSounds() {
@@ -212,6 +218,9 @@ public class MainActivity extends Activity {
             setHideyBar();
         }
         mDualJoystickView.requestLayout();
+
+
+        mWearController.connect();
     }
 
     @Override
@@ -227,6 +236,8 @@ public class MainActivity extends Activity {
         if (mCrazyflie != null) {
             disconnect();
         }
+
+        mWearController.disconnect();
     }
 
     @Override
