@@ -27,17 +27,6 @@
 
 package se.bitcraze.crazyflielib;
 
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.UUID;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import se.bitcraze.crazyflielib.crazyradio.ConnectionData;
-import se.bitcraze.crazyflielib.crtp.CrtpDriver;
-import se.bitcraze.crazyflielib.crtp.CrtpPacket;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -52,6 +41,18 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.UUID;
+
+import se.bitcraze.crazyflielib.crazyradio.ConnectionData;
+import se.bitcraze.crazyflielib.crtp.CrtpDriver;
+import se.bitcraze.crazyflielib.crtp.CrtpPacket;
 
 @SuppressLint("NewApi")
 public class BleLink extends CrtpDriver {
@@ -79,14 +80,14 @@ public class BleLink extends CrtpDriver {
 
 	private final static int REQUEST_ENABLE_BT = 1;
 	protected boolean mWritten = true;
-	private Activity mContext;
+	private Context mContext;
 	private boolean mWriteWithAnswer;
 	protected boolean mConnected;
 
 	protected enum State {IDLE, CONNECTING, CONNECTED};
 	protected State state = State.IDLE;
 
-	public BleLink(Activity ctx, boolean writeWithAnswer) {
+	public BleLink(Context ctx, boolean writeWithAnswer) {
 		mContext = ctx;
 		mWriteWithAnswer = writeWithAnswer;
 	}
@@ -173,12 +174,16 @@ public class BleLink extends CrtpDriver {
 					}
 					state = State.CONNECTING;
 					mDevice = device;
-					mContext.runOnUiThread(new Runnable() {
-						@Override
-                        public void run() {
-							mDevice.connectGatt(mContext, false, mGattCallback);
-						}
-					});
+
+                    // FIXME
+                    if (mContext instanceof Activity) {
+                        ((Activity)mContext).runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                mDevice.connectGatt(mContext, false, mGattCallback);
+                            }
+                        });
+                    }
 				}
 			}
 		}
@@ -197,7 +202,12 @@ public class BleLink extends CrtpDriver {
 
 		if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
 		    Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-		    mContext.startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+
+            // FIXME
+            if (mContext instanceof Activity) {
+                ((Activity) mContext).startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+            }
+
 		    throw new IllegalArgumentException("Bluetooth needs to be started");
 		}
 
@@ -222,23 +232,26 @@ public class BleLink extends CrtpDriver {
 
 	@Override
 	public void disconnect() {
-		mContext.runOnUiThread(new Runnable() {
-			public void run() {
-				if(mConnected) {
-					mGatt.disconnect();
-					mGatt.close();
-					mGatt = null;
-					mConnected = false;
-					mBluetoothAdapter.stopLeScan(mLeScanCallback);
-					if (mScannTimer != null) {
-						mScannTimer.cancel();
-						mScannTimer = null;
-					}
-					state = State.IDLE;
-					notifyDisconnected();
-				}
-			}
-		});
+        // FIXME
+        if (mContext instanceof Activity) {
+            ((Activity) mContext).runOnUiThread(new Runnable() {
+                public void run() {
+                    if (mConnected) {
+                        mGatt.disconnect();
+                        mGatt.close();
+                        mGatt = null;
+                        mConnected = false;
+                        mBluetoothAdapter.stopLeScan(mLeScanCallback);
+                        if (mScannTimer != null) {
+                            mScannTimer.cancel();
+                            mScannTimer = null;
+                        }
+                        state = State.IDLE;
+                        notifyDisconnected();
+                    }
+                }
+            });
+        }
 	}
 
 	@Override
@@ -276,7 +289,10 @@ public class BleLink extends CrtpDriver {
 				}
 	        }
 		}
-		mContext.runOnUiThread(new SendBlePacket(packet));
+        // FIXME
+        if (mContext instanceof Activity) {
+            ((Activity) mContext).runOnUiThread(new SendBlePacket(packet));
+        }
 	}
 
     @Override

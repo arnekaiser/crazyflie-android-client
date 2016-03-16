@@ -24,6 +24,9 @@
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
+        <service
+            android:name="se.bitcraze.crazyfliecontrol2.CommanderService" >
+        </service>
         <activity
             android:name="se.bitcraze.crazyfliecontrol2.MainActivity"
             android:label="@string/title_activity_main"

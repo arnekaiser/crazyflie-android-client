@@ -30,12 +30,13 @@ package se.bitcraze.crazyfliecontrol2;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
 import android.media.AudioManager;
@@ -44,6 +45,7 @@ import android.media.SoundPool.OnLoadCompleteListener;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.InputDevice;
@@ -55,7 +57,6 @@ import android.widget.Toast;
 
 import com.MobileAnarchy.Android.Widgets.Joystick.DualJoystickView;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 
@@ -65,16 +66,10 @@ import se.bitcraze.crazyfliecontrol.controller.GyroscopeController;
 import se.bitcraze.crazyfliecontrol.controller.IController;
 import se.bitcraze.crazyfliecontrol.controller.TouchController;
 import se.bitcraze.crazyfliecontrol.prefs.PreferencesActivity;
-import se.bitcraze.crazyflielib.BleLink;
-import se.bitcraze.crazyflielib.crazyflie.ConnectionAdapter;
 import se.bitcraze.crazyflielib.crazyflie.Crazyflie;
-import se.bitcraze.crazyflielib.crazyradio.ConnectionData;
 import se.bitcraze.crazyflielib.crazyradio.Crazyradio;
-import se.bitcraze.crazyflielib.crazyradio.RadioDriver;
-import se.bitcraze.crazyflielib.crtp.CommanderPacket;
-import se.bitcraze.crazyflielib.crtp.CrtpDriver;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements ServiceConnection {
 
     private static final String LOG_TAG = "CrazyflieControl";
 
@@ -103,6 +98,9 @@ public class MainActivity extends Activity {
     private int mSoundDisconnect;
 
     private ImageButton mToggleConnectButton;
+
+    private CommanderService mService;
+    private boolean mIsServiceBound = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -135,6 +133,14 @@ public class MainActivity extends Activity {
         registerReceiver(mUsbReceiver, filter);
 
         initializeSounds();
+
+
+        /*
+         * BIND_AUTO_CREATE - service will always be created, this forces the call of onServiceConnected
+		 * BIND_ABOVE_CLIENT - service will run as long as possible; if out of memory, activities will be killed first
+		 */
+        int flags = BIND_AUTO_CREATE | BIND_ABOVE_CLIENT;
+        bindService(new Intent(this, CommanderService.class), this, flags);
     }
 
     private void initializeSounds() {
@@ -231,6 +237,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        unbindService(this);
         unregisterReceiver(mUsbReceiver);
         mSoundPool.release();
         mSoundPool = null;
@@ -271,8 +278,7 @@ public class MainActivity extends Activity {
     @TargetApi(Build.VERSION_CODES.KITKAT)
     private void setHideyBar() {
         Log.i(LOG_TAG, "Activating immersive mode");
-        int uiOptions = getWindow().getDecorView().getSystemUiVisibility();
-        int newUiOptions = uiOptions;
+        int newUiOptions = getWindow().getDecorView().getSystemUiVisibility();
 
         if(Build.VERSION.SDK_INT >= 14){
             newUiOptions |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION;
@@ -337,6 +343,9 @@ public class MainActivity extends Activity {
 
         }
         mController.enable();
+        if (mIsServiceBound && mService != null) {
+            mService.setController(mController);
+        }
     }
 
     private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver() {
@@ -387,7 +396,12 @@ public class MainActivity extends Activity {
         }
     }
 
+
     private void connect() {
+        if (mIsServiceBound) {
+            mService.connect();
+        }
+    /*
         // ensure previous link is disconnected
         disconnect();
 
@@ -520,12 +534,14 @@ public class MainActivity extends Activity {
         } else {
             Toast.makeText(this, "Cannot connect: Crazyradio not attached and Bluetooth LE not available", Toast.LENGTH_SHORT).show();
         }
+    */
     }
+
 
     /**
      * Start thread to periodically send commands containing the user input
      */
-    private void startSendJoystickDataThread() {
+    /*private void startSendJoystickDataThread() {
         mSendJoystickDataThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -542,13 +558,18 @@ public class MainActivity extends Activity {
             }
         });
         mSendJoystickDataThread.start();
-    }
+    }*/
 
     public Crazyflie getCrazyflie(){
         return mCrazyflie;
     }
 
+
     public void disconnect() {
+        if (mIsServiceBound) {
+            mService.disconnect();
+        }
+        /*
         if (mCrazyflie != null) {
             mCrazyflie.disconnect();
             mCrazyflie = null;
@@ -565,7 +586,9 @@ public class MainActivity extends Activity {
                 mFlightDataView.setLinkQualityText("n/a");
             }
         });
+        */
     }
+
 
     public IController getController(){
     	return mController;
@@ -578,5 +601,20 @@ public class MainActivity extends Activity {
         }
         List<UsbDevice> usbDeviceList = UsbLinkAndroid.findUsbDevices(usbManager, (short) Crazyradio.CRADIO_VID, (short) Crazyradio.CRADIO_PID);
         return !usbDeviceList.isEmpty();
+    }
+
+    @Override
+    public void onServiceConnected(ComponentName name, IBinder service) {
+        mService = ((CommanderService.ServiceBinder) service).getService();
+        mService.setController(mController);
+        mService.setControls(mControls);
+        mIsServiceBound = true;
+        Log.d(getClass().getName(), "service bound");
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName name) {
+        mIsServiceBound = false;
+        Log.d(getClass().getName(), "service unbound");
     }
 }
